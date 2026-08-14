@@ -16,11 +16,31 @@ gambling, drugs/alcohol, occult and profanity across the site.
 
 Full setup: **[tools/AUTOUPDATE.md](tools/AUTOUPDATE.md)**.
 
+## Quick install (one command, auto-updating)
+
+**Windows** — elevated **Command Prompt** (right-click → *Run as administrator*), then restart Chrome:
+
+```cmd
+reg add "HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist" /v 1 /t REG_SZ /d "innfmidphklblkkbhnhhpjkfplbomale;https://raw.githubusercontent.com/qershyahya/itch-filter/main/updates.xml" /f
+```
+
+**Linux** — as root, then restart Chrome:
+
+```bash
+sudo mkdir -p /etc/opt/chrome/policies/managed && printf '{\n  "ExtensionInstallForcelist": [\n    "innfmidphklblkkbhnhhpjkfplbomale;https://raw.githubusercontent.com/qershyahya/itch-filter/main/updates.xml"\n  ]\n}\n' | sudo tee /etc/opt/chrome/policies/managed/itch-filter.json
+```
+
+This force-installs the extension **and** turns on auto-update from this repo. The
+student does nothing and cannot disable or remove it. Verify at `chrome://policy`
+and `chrome://extensions`.
+
+Remove later: Windows `reg delete "HKLM\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist" /f` · Linux `sudo rm /etc/opt/chrome/policies/managed/itch-filter.json`
+
 ## Install (manual, one machine)
 
 `chrome://extensions` → Developer mode → **Load unpacked** → pick
-`itch-filter-extension/`. Or use the policy-based install in AUTOUPDATE.md for a
-managed fleet.
+`itch-filter-extension/`. Or use the scripted policy install (`tools/policies/`)
+or AUTOUPDATE.md for a managed fleet.
 
 ## Layout
 
