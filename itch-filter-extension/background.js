@@ -2,24 +2,46 @@
    fetch is allowed here via host_permissions — no CORS problem). */
 importScripts("rules.js", "defaultConfig.js");
 
-/* ---- central list-sync from a GitHub raw JSON (edit the file → all machines
-   follow within the hour; no reinstall). Leave SYNC_URL "" to disable.
-   The JSON is the same shape as defaultConfig; only the list fields below are
-   pulled. pinHash/pinSalt stay local. Fails open (keeps current config). ---- */
-const SYNC_URL = ""; // e.g. "https://raw.githubusercontent.com/USER/REPO/main/filter-config.json"
+/* ---- GitHub is the single source of truth for the lists ----
+   On startup, on every itch.io page load (throttled), and hourly, the worker
+   fetches filter-config.json, checksums it, and pulls when it differs. It also
+   re-asserts GitHub's lists over any local edit, so the only way to change what
+   is blocked is to edit the file in the GitHub account — a student cannot loosen
+   it on the machine. pinHash/pinSalt stay local. Fails open (keeps last lists)
+   if GitHub is unreachable, so blocking never silently turns off. */
+const SYNC_URL = "https://raw.githubusercontent.com/qershyahya/itch-filter/main/filter-config.json";
 const SYNC_FIELDS = ["enabled", "bannedTags", "bannedKeywords", "blockedSlugs", "blockedCreators", "allowedIds", "blockedIds"];
+const SYNC_THROTTLE_MS = 120000; // network floor: at most one pull per 2 min from page-load pings
+let lastSyncAt = 0, syncing = null;
 
-async function syncRemote() {
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+const pick = (o, keys) => JSON.stringify(keys.map((k) => o?.[k]));
+
+async function syncRemote(force = false) {
   if (!SYNC_URL) return;
-  try {
-    const remote = await fetch(SYNC_URL, { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    const { config } = await chrome.storage.local.get("config");
-    const next = { ...(config || self.DEFAULT_CONFIG) }; // keeps pinHash/pinSalt
-    for (const k of SYNC_FIELDS) {
-      if (Array.isArray(remote[k]) || typeof remote[k] === "boolean") next[k] = remote[k];
-    }
-    await chrome.storage.local.set({ config: next, lastSync: Date.now() });
-  } catch { /* fail-open: keep whatever config we already have */ }
+  if (!force && Date.now() - lastSyncAt < SYNC_THROTTLE_MS) return; // page-load throttle
+  if (syncing) return syncing;                                     // coalesce concurrent pulls
+  syncing = (async () => {
+    try {
+      const text = await fetch(SYNC_URL, { cache: "no-store" }).then((r) => (r.ok ? r.text() : Promise.reject(r.status)));
+      lastSyncAt = Date.now();
+      const hash = await sha256(text);
+      const remote = JSON.parse(text);
+      const { config, cfgHash } = await chrome.storage.local.get(["config", "cfgHash"]);
+      const cur = config || self.DEFAULT_CONFIG;
+      const next = { ...cur }; // keeps pinHash/pinSalt
+      for (const k of SYNC_FIELDS) if (Array.isArray(remote[k]) || typeof remote[k] === "boolean") next[k] = remote[k];
+      // write when the remote changed OR local lists drifted from remote (tamper revert)
+      if (hash !== cfgHash || pick(next, SYNC_FIELDS) !== pick(cur, SYNC_FIELDS)) {
+        await chrome.storage.local.set({ config: next, cfgHash: hash, lastSync: Date.now() });
+      }
+    } catch { /* fail-open: keep whatever lists we already have */ }
+    finally { syncing = null; }
+  })();
+  return syncing;
 }
 
 // seed default config on install, then sync + schedule hourly pulls
@@ -27,10 +49,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   const { config } = await chrome.storage.local.get("config");
   if (!config) await chrome.storage.local.set({ config: self.DEFAULT_CONFIG });
   chrome.alarms.create("cf-sync", { periodInMinutes: 60 });
-  syncRemote();
+  syncRemote(true);
 });
-chrome.runtime.onStartup.addListener(syncRemote);
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === "cf-sync") syncRemote(); });
+chrome.runtime.onStartup.addListener(() => syncRemote(true));   // every Chrome reload
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === "cf-sync") syncRemote(true); });
 
 let cfgCache = null;
 async function getConfig() {
@@ -99,4 +121,5 @@ async function checkGame(url) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "check-game") { checkGame(msg.url).then(sendResponse); return true; }
+  if (msg?.type === "sync-now") { syncRemote(false).then(() => sendResponse(true)); return true; } // page-load freshness check
 });

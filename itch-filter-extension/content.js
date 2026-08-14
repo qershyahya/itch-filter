@@ -207,6 +207,9 @@
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  // on every page load, ask the worker to checksum GitHub and pull if different
+  try { chrome.runtime.sendMessage({ type: "sync-now" }, () => void chrome.runtime.lastError); } catch {}
+
   // load config, then run
   chrome.storage.local.get("config", (r) => {
     if (r && r.config) cfg = r.config;
