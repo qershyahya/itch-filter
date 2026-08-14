@@ -89,6 +89,16 @@ async function fetchHtml(url) {
   throw err;
 }
 
+// Jam entry "rate" pages (/jam/<slug>/rate/<id>) carry no game_info_panel_widget,
+// so tags can't be read from them. Follow to the real game page and verify that.
+async function resolveGameUrl(url) {
+  if (!/\/jam\/[^/]+\/rate\/\d+/.test(url)) return url;
+  const html = await fetchHtml(url);
+  const m = html.match(/href="(https?:\/\/[a-z0-9-]+\.itch\.io\/[a-z0-9-]+)"/i); // first real game-page link
+  if (!m) throw new Error("unresolved rate url"); // fail-closed: no game page → stay hidden
+  return m[1];
+}
+
 async function checkGame(url) {
   const cfg = await getConfig();
   if (!cfg.enabled) return { blocked: false, reason: "disabled" };
@@ -96,7 +106,8 @@ async function checkGame(url) {
   if (cached) return cached;
   await acquire();
   try {
-    const html = await fetchHtml(url);
+    const realUrl = await resolveGameUrl(url);
+    const html = await fetchHtml(realUrl);
     // tags/genre from the game's "More information" panel(s), any section prefix
     const panels = [...html.matchAll(/game_info_panel_widget/g)]
       .map((m) => html.slice(m.index, m.index + 2500)).join("\n");
