@@ -1,6 +1,8 @@
 /* Background service worker: owns config, verifies game/jam pages (cross-site
    fetch is allowed here via host_permissions — no CORS problem). */
-importScripts("rules.js", "defaultConfig.js");
+// Chrome loads these via the service worker; Firefox loads them as background
+// scripts (manifest.firefox.json) before this file, so importScripts is absent.
+if (typeof importScripts === "function") importScripts("rules.js", "defaultConfig.js");
 
 /* ---- GitHub is the single source of truth for the lists ----
    On startup, on every itch.io page load (throttled), and hourly, the worker
