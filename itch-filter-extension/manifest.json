@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "itch.io Content Filter",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Filters itch.io games, jams, devlogs, collections and comments for a safe (Islamic students') environment.",
   "permissions": [
     "storage",
@@ -11,7 +11,8 @@
     "*://itch.io/*",
     "*://*.itch.io/*",
     "*://*.itch.zone/*",
-    "https://raw.githubusercontent.com/*"
+    "https://raw.githubusercontent.com/*",
+    "https://docs.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"

@@ -46,6 +46,8 @@ function openEditor(cfg) {
   $("blockedSlugs").value = lines(cfg.blockedSlugs);
   $("blockedCreators").value = lines(cfg.blockedCreators);
   $("allowedIds").value = lines(cfg.allowedIds);
+  $("reviewUrl").value = cfg.reviewUrl || "";
+  $("reviewEntry").value = cfg.reviewEntry || "";
 }
 
 $("save").onclick = async () => {
@@ -58,6 +60,9 @@ $("save").onclick = async () => {
     blockedCreators: toArr($("blockedCreators").value),
     allowedIds: toArr($("allowedIds").value),
     blockedIds: cfg.blockedIds || [],
+    reviewUrl: $("reviewUrl").value.trim(),
+    reviewEntry: $("reviewEntry").value.trim(),
+    reviewReasonEntry: cfg.reviewReasonEntry || "",
   });
   await chrome.storage.local.set({ config: cfg });
   msg("Saved. Reload itch.io tabs to apply.");

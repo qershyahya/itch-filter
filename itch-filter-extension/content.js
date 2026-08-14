@@ -71,11 +71,28 @@
 
   /* ---- whole-page block (banned category/search/slug) ---- */
   function blockPage(reason) {
+    const url = location.href;
+    const canReview = Boolean(cfg.reviewUrl && cfg.reviewEntry);
     document.documentElement.innerHTML =
       '<body style="background:#1b1733;color:#f4f1e8;font-family:sans-serif;display:flex;' +
-      'align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center">' +
-      '<h1 style="color:#ffc247">Hidden</h1><p>This page was blocked by the content filter.</p></div></body>';
+      'align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center;max-width:440px;padding:20px">' +
+      '<h1 style="color:#ffc247">Hidden</h1><p>This page was blocked by the content filter.</p>' +
+      (canReview
+        ? '<button id="cf-review" style="background:#ffc247;color:#241b3a;border:0;border-radius:8px;' +
+          'padding:10px 18px;font-weight:700;cursor:pointer;margin-top:8px">Request review</button>' +
+          '<p id="cf-review-msg" style="color:#6fd39a;min-height:18px;margin-top:10px"></p>'
+        : '') +
+      '</div></body>';
     window.__cfBlocked = reason;
+    const btn = document.getElementById("cf-review");
+    if (btn) btn.addEventListener("click", () => {
+      btn.disabled = true;
+      chrome.runtime.sendMessage({ type: "review-submit", url, reason }, (r) => {
+        const m = document.getElementById("cf-review-msg");
+        if (r && r.ok) { m.textContent = "Sent for review ✓"; }
+        else { m.textContent = "Could not send — try again later."; btn.disabled = false; }
+      });
+    });
   }
   function filterBannedUrl() {
     const url = new URL(location.href);

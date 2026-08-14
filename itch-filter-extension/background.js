@@ -11,6 +11,7 @@ importScripts("rules.js", "defaultConfig.js");
    if GitHub is unreachable, so blocking never silently turns off. */
 const SYNC_URL = "https://raw.githubusercontent.com/qershyahya/itch-filter/main/filter-config.json";
 const SYNC_FIELDS = ["enabled", "bannedTags", "bannedKeywords", "blockedSlugs", "blockedCreators", "allowedIds", "blockedIds"];
+const SYNC_STRINGS = ["reviewUrl", "reviewEntry", "reviewReasonEntry"]; // review-request Google Form target
 const SYNC_THROTTLE_MS = 120000; // network floor: at most one pull per 2 min from page-load pings
 let lastSyncAt = 0, syncing = null;
 
@@ -34,8 +35,10 @@ async function syncRemote(force = false) {
       const cur = config || self.DEFAULT_CONFIG;
       const next = { ...cur }; // keeps pinHash/pinSalt
       for (const k of SYNC_FIELDS) if (Array.isArray(remote[k]) || typeof remote[k] === "boolean") next[k] = remote[k];
+      for (const k of SYNC_STRINGS) if (typeof remote[k] === "string") next[k] = remote[k];
+      const all = [...SYNC_FIELDS, ...SYNC_STRINGS];
       // write when the remote changed OR local lists drifted from remote (tamper revert)
-      if (hash !== cfgHash || pick(next, SYNC_FIELDS) !== pick(cur, SYNC_FIELDS)) {
+      if (hash !== cfgHash || pick(next, all) !== pick(cur, all)) {
         await chrome.storage.local.set({ config: next, cfgHash: hash, lastSync: Date.now() });
       }
     } catch { /* fail-open: keep whatever lists we already have */ }
@@ -130,7 +133,25 @@ async function checkGame(url) {
   } finally { release(); }
 }
 
+// send a blocked URL to the teacher's Google Form (formResponse endpoint)
+async function submitReview(url, reason) {
+  const cfg = await getConfig();
+  if (!cfg.reviewUrl || !cfg.reviewEntry) return { ok: false };
+  try {
+    const body = new URLSearchParams();
+    body.set(cfg.reviewEntry, url);
+    if (cfg.reviewReasonEntry) body.set(cfg.reviewReasonEntry, reason || "");
+    await fetch(cfg.reviewUrl, {
+      method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    return { ok: true }; // no-cors → opaque; the POST still lands in the Form's sheet
+  } catch { return { ok: false }; }
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "check-game") { checkGame(msg.url).then(sendResponse); return true; }
   if (msg?.type === "sync-now") { syncRemote(false).then(() => sendResponse(true)); return true; } // page-load freshness check
+  if (msg?.type === "review-submit") { submitReview(msg.url, msg.reason).then(sendResponse); return true; }
 });
