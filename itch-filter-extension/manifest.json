@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "itch.io Content Filter",
+  "version": "1.0.1",
+  "description": "Filters itch.io games, jams, devlogs, collections and comments for a safe (Islamic students') environment.",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://itch.io/*",
+    "*://*.itch.io/*",
+    "*://*.itch.zone/*",
+    "https://raw.githubusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://itch.io/*",
+        "*://*.itch.io/*"
+      ],
+      "js": [
+        "rules.js",
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "options_page": "options.html",
+  "action": {
+    "default_title": "itch.io Content Filter — settings",
+    "default_popup": "options.html"
+  },
+  "update_url": "https://raw.githubusercontent.com/qershyahya/itch-filter/main/updates.xml"
+}

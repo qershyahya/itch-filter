@@ -1,0 +1,4 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist]
+"1"="innfmidphklblkkbhnhhpjkfplbomale;https://raw.githubusercontent.com/qershyahya/itch-filter/main/updates.xml"

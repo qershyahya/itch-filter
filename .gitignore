@@ -1,0 +1,4 @@
+signing-key.pem
+*.pem
+node_modules/
+.DS_Store
