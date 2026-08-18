@@ -156,7 +156,16 @@ if ($chromium) {
 }
 
 # ---------- show the welcome page in each selected browser ----------
+# NOTE: --load-extension is ignored if that browser is ALREADY running (the new
+# window just attaches to the existing process). Close them first, or the filter
+# will appear "not installed" until the next full restart of the browser.
 Say 'Opening welcome page'
+foreach ($b in $selected) {
+  $proc = @{ chrome='chrome'; edge='msedge'; opera='opera'; firefox='firefox' }[$b]
+  if (Get-Process $proc -ErrorAction SilentlyContinue) {
+    Write-Host "NOTE: $b is running — close ALL its windows and re-open it, or the extension will not load." -ForegroundColor Yellow
+  }
+}
 foreach ($b in $selected) {
   try {
     if ($b -eq 'firefox') { Start-Process $found[$b] -ArgumentList $welcomeUrl }
