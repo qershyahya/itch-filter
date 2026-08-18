@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "itch.io Content Filter",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Filters itch.io games, jams, devlogs, collections and comments for a safe, family-friendly environment.",
   "permissions": [
     "storage",
@@ -40,7 +40,7 @@
     "open_in_tab": true
   },
   "action": {
-    "default_title": "itch.io Content Filter — settings",
+    "default_title": "itch.io Content Filter \u2014 settings",
     "default_popup": "options.html"
   },
   "browser_specific_settings": {
@@ -48,7 +48,9 @@
       "id": "itch-filter@qershyahya",
       "strict_min_version": "128.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   }
