@@ -1,15 +1,19 @@
-# itch.io Safeguard Filter — Windows installer (all browsers, no Git Bash needed).
+# itch.io Safeguard Filter - Windows installer (all browsers, no Git Bash needed).
 # Run in an ELEVATED PowerShell:
 #     powershell -ExecutionPolicy Bypass -File install-all.ps1
 #
 #   -Browsers all|firefox,chrome,edge,opera   which browsers to install into (default: all)
 #   -Quiet                                    skip the interactive menu, use -Browsers
 #
-#   Firefox            -> force-installed via distribution\policies.json (enforced)
-#   Chrome/Edge/Opera  -> auto-loaded via --load-extension on their shortcuts (deterrent)
+#   Firefox      -> force-installed via distribution\policies.json (enforced, cannot be removed)
+#   Edge/Opera   -> auto-loaded via --load-extension on their shortcuts (user-removable)
+#   Chrome       -> guided manual "Load unpacked" (Chrome blocks every automated
+#                   install of a self-hosted extension; this is the only way that
+#                   persists without re-injecting on each launch)
 #
-# After installing, each selected browser opens a welcome page confirming the filter
-# is active. Re-run any time to update to the latest published version.
+# After installing, each selected browser opens a welcome page, and the script
+# VERIFIES that the extension is actually loaded in every selected browser.
+# Re-run any time to update to the latest published version.
 param(
   [string]$Browsers = '',
   [switch]$Quiet
@@ -100,12 +104,12 @@ $welcomeUrl = ([Uri](New-Object Uri($WELCOME))).AbsoluteUri
 # ---------- Firefox ----------
 if ($selected -contains 'firefox') {
   Say 'Firefox'
-  if (-not $isAdmin) { Write-Host 'NOT elevated — re-run as Administrator to force-install into Firefox.' }
+  if (-not $isAdmin) { Write-Host 'NOT elevated - re-run as Administrator to force-install into Firefox.' }
   else {
     $policy = @{ policies = @{ ExtensionSettings = @{ "$GECKO" = @{ installation_mode = 'force_installed'; install_url = $XPI } } } }
     $dist = Join-Path (Split-Path $found['firefox']) 'distribution'
     New-Item -ItemType Directory -Path $dist -Force | Out-Null
-    # must be BOM-less UTF-8 — a BOM makes Firefox silently ignore the policy file
+    # must be BOM-less UTF-8 - a BOM makes Firefox silently ignore the policy file
     [IO.File]::WriteAllText((Join-Path $dist 'policies.json'),
                             ($policy | ConvertTo-Json -Depth 6),
                             (New-Object Text.UTF8Encoding $false))
@@ -114,10 +118,14 @@ if ($selected -contains 'firefox') {
 }
 
 # ---------- Chromium browsers ----------
-$chromium = $selected | Where-Object { $_ -ne 'firefox' }
+# NOTE: Chrome is deliberately NOT in this list. Google Chrome refuses
+# --load-extension ("not allowed in Google Chrome, ignoring"), refuses external
+# registry installs of off-store .crx files, and force-list policy only accepts
+# Web-Store-hosted extensions. Chrome is handled by the guided manual step below.
+$chromium = $selected | Where-Object { $_ -ne 'firefox' -and $_ -ne 'chrome' }
 if ($chromium) {
   Say ('Chromium browsers: ' + ($chromium -join ', '))
-  $exeFor = @{ chrome = 'chrome'; edge = 'msedge'; opera = @('opera','launcher') }
+  $exeFor = @{ edge = 'msedge'; opera = @('opera','launcher') }
   $targets = @(); foreach ($c in $chromium) { $targets += $exeFor[$c] }
   $flag = "--load-extension=$EXTDIR"
 
@@ -155,6 +163,57 @@ if ($chromium) {
   else { Write-Host "$patched shortcut(s) patched." }
 }
 
+# ---------- verification helpers ----------
+function Test-FirefoxLoaded {
+  $hit = $false
+  Get-ChildItem 'C:\Users' -Directory -EA SilentlyContinue | ForEach-Object {
+    $pdir = Join-Path $_.FullName 'AppData\Roaming\Mozilla\Firefox\Profiles'
+    if (Test-Path $pdir) {
+      Get-ChildItem $pdir -Directory -EA SilentlyContinue | ForEach-Object {
+        $f = Join-Path $_.FullName 'extensions.json'
+        if ((Test-Path $f) -and ((Get-Content $f -Raw -EA SilentlyContinue) -like "*$GECKO*")) { $hit = $true }
+      }
+    }
+  }
+  $hit
+}
+function Test-ChromiumLoaded([string]$vendorPath) {
+  # unpacked / installed extensions are recorded in the profile's preference files
+  $hit = $false
+  Get-ChildItem 'C:\Users' -Directory -EA SilentlyContinue | ForEach-Object {
+    $ud = Join-Path $_.FullName $vendorPath
+    if (Test-Path $ud) {
+      Get-ChildItem $ud -Directory -EA SilentlyContinue | ForEach-Object {
+        foreach ($n in 'Preferences','Secure Preferences') {
+          $f = Join-Path $_.FullName $n
+          if (Test-Path $f) {
+            $c = Get-Content $f -Raw -EA SilentlyContinue
+            if ($c -and ($c -like '*itch-filter\\\\extension*' -or $c -like '*itch.io Safeguard*' -or $c -like '*itch-filter/extension*')) { $hit = $true }
+          }
+        }
+      }
+    }
+  }
+  $hit
+}
+
+# ---------- Chrome: guided manual install (only method Chrome still allows) ----------
+if ($selected -contains 'chrome') {
+  Say 'Google Chrome - guided manual step'
+  Write-Host 'Chrome blocks every automated install of a self-hosted extension,'
+  Write-Host 'so it needs 5 clicks. The folder and the page are opened for you.' -ForegroundColor Yellow
+  Write-Host ''
+  Write-Host '  1. Chrome opens on the Extensions page (chrome://extensions).'
+  Write-Host '  2. Turn ON "Developer mode" (top-right toggle).'
+  Write-Host '  3. Click "Load unpacked" (top-left).'
+  Write-Host "  4. Choose this folder:  $EXTDIR"
+  Write-Host '  5. Click "Select Folder". The filter appears in the list.'
+  Write-Host ''
+  Start-Process explorer.exe $EXTDIR
+  Start-Process $found['chrome'] -ArgumentList 'chrome://extensions'
+  Read-Host 'Press Enter here when you have finished those steps'
+}
+
 # ---------- show the welcome page in each selected browser ----------
 # NOTE: --load-extension is ignored if that browser is ALREADY running (the new
 # window just attaches to the existing process). Close them first, or the filter
@@ -163,7 +222,7 @@ Say 'Opening welcome page'
 foreach ($b in $selected) {
   $proc = @{ chrome='chrome'; edge='msedge'; opera='opera'; firefox='firefox' }[$b]
   if (Get-Process $proc -ErrorAction SilentlyContinue) {
-    Write-Host "NOTE: $b is running — close ALL its windows and re-open it, or the extension will not load." -ForegroundColor Yellow
+    Write-Host "NOTE: $b is running - close ALL its windows and re-open it, or the extension will not load." -ForegroundColor Yellow
   }
 }
 foreach ($b in $selected) {
@@ -175,6 +234,35 @@ foreach ($b in $selected) {
   } catch { Write-Host "could not open $b : $($_.Exception.Message)" }
 }
 
+# ---------- final verification ----------
+Say 'Verifying installation'
+Start-Sleep 6
+$results = @()
+foreach ($b in $selected) {
+  switch ($b) {
+    'firefox' { $ok = Test-FirefoxLoaded }
+    'chrome'  { $ok = Test-ChromiumLoaded 'AppData\Local\Google\Chrome\User Data' }
+    'edge'    { $ok = Test-ChromiumLoaded 'AppData\Local\Microsoft\Edge\User Data' }
+    'opera'   { $ok = Test-ChromiumLoaded 'AppData\Roaming\Opera Software\Opera Stable' }
+    default   { $ok = $false }
+  }
+  $results += [pscustomobject]@{ Browser = $b; Loaded = $ok }
+  if ($ok) { Write-Host ("  {0,-8} LOADED" -f $b) -ForegroundColor Green }
+  else     { Write-Host ("  {0,-8} NOT DETECTED" -f $b) -ForegroundColor Red }
+}
+
+$bad = $results | Where-Object { -not $_.Loaded }
 Say 'Done'
-Write-Host 'Firefox is enforced. Chromium loading is a deterrent (an admin can remove the flag).'
+if (-not $bad) {
+  Write-Host 'All selected browsers are protected.' -ForegroundColor Green
+} else {
+  Write-Host ('Not detected in: ' + (($bad.Browser) -join ', ')) -ForegroundColor Yellow
+  Write-Host 'Fixes:'
+  Write-Host '  - The browser must be FULLY closed and reopened once after install.'
+  Write-Host '  - Chrome: repeat the 5-click "Load unpacked" step above.'
+  Write-Host '  - Firefox: re-run this script as Administrator.'
+  Write-Host "  - Then re-run:  powershell -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Quiet"
+}
+Write-Host ''
+Write-Host 'Firefox is enforced (cannot be removed). Chrome/Edge/Opera are user-removable.'
 Write-Host 'Re-run this script any time to update to the latest published version.'
