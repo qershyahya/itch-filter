@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "itch.io Content Filter",
-  "version": "1.0.5",
-  "description": "Filters itch.io games, jams, devlogs, collections and comments for a safe (Islamic students') environment.",
+  "version": "1.0.6",
+  "description": "Filters itch.io games, jams, devlogs, collections and comments for a safe, family-friendly environment.",
   "permissions": [
     "storage",
     "alarms"

@@ -3,7 +3,7 @@
 Filters itch.io in regular Chrome: games, jams, devlogs, collections, community
 topics, comments — plus a page-block for banned categories/searches and a manual
 block-list. Same rules as the desktop-app version (61 tags / 599 keywords, tuned
-for an Islamic students' environment).
+for a family-friendly environment).
 
 ## Install (one time)
 

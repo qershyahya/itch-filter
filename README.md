@@ -1,7 +1,7 @@
 # itch.io Content Filter
 
 A Chrome extension that filters itch.io — games, game assets, jams, devlogs,
-collections, community topics and comments — for a safe (Islamic students')
+collections, community topics and comments — for a safe, family-friendly
 environment. Blocks sexual/adult, LGBTQ, dating/romance, horror/violence,
 gambling, drugs/alcohol, occult and profanity across the site.
 
