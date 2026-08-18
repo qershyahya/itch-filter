@@ -1,5 +1,16 @@
 # Free auto-update for the itch.io Content Filter
 
+> **IMPORTANT (tested, 2026):** the self-hosted `.crx` + `updates.xml` +
+> `ExtensionInstallForcelist` route below does **not** work on Google Chrome.
+> Chrome only force-installs extensions hosted in the **Chrome Web Store**; a
+> self-hosted update_url is ignored unless the device is enterprise-managed.
+> Verified on an unmanaged Windows 11 machine: a Web-Store extension installed via
+> that exact policy, ours did not. Use `tools/policies/windows/install-all.ps1`
+> instead. This file is kept for the Firefox flow and for the day the extension is
+> published to the Web Store.
+
+
+
 Two independent update channels, both free, no Chrome Web Store:
 
 | What changes | Channel | How you push it |
