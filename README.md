@@ -12,10 +12,27 @@ so nothing appears and then vanishes, and a card you can see is a page you can o
 
 ## Install
 
-### Windows - one script, all browsers
+### Windows - one command (remote devices)
 
-Run in an **elevated PowerShell** (right-click PowerShell -> *Run as administrator*).
-No clone needed - this downloads and runs the current script:
+Paste into **any** PowerShell window - it self-elevates (accept the UAC prompt),
+downloads the current installer, and installs into every browser it finds:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/qershyahya/itch-filter/main/install.ps1 | iex"
+```
+
+No admin prompt wanted / already elevated? The same command works there too.
+
+**Offline or blocked network** (no GitHub access) - copy `itch-filter-extension/`
+to the machine or a share, then:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install-all.ps1 -Source "\\server\share\itch-filter-extension"
+```
+
+<details><summary>Manual / advanced install</summary>
+
+Run in an **elevated PowerShell**. No clone needed - downloads and runs the current script:
 
 ```powershell
 $f="$env:TEMP\install-all.ps1"; irm https://raw.githubusercontent.com/qershyahya/itch-filter/main/tools/policies/windows/install-all.ps1 -OutFile $f; powershell -ExecutionPolicy Bypass -File $f
@@ -46,6 +63,8 @@ Remove everything (elevated):
 ```powershell
 $f="$env:TEMP\uninstall-all.ps1"; irm https://raw.githubusercontent.com/qershyahya/itch-filter/main/tools/policies/windows/uninstall-all.ps1 -OutFile $f; powershell -ExecutionPolicy Bypass -File $f
 ```
+
+</details>
 
 ### Linux / macOS
 
