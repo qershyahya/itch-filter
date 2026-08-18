@@ -16,7 +16,10 @@
 # Re-run any time to update to the latest published version.
 param(
   [string]$Browsers = '',
-  [switch]$Quiet
+  [switch]$Quiet,
+  # Install from a local/UNC folder instead of downloading (offline, or when
+  # github.com / raw.githubusercontent.com cannot be resolved on this network).
+  [string]$Source = ''
 )
 $ErrorActionPreference = 'Continue'
 $REPO   = 'qershyahya/itch-filter'
@@ -120,8 +123,22 @@ $tmp = Join-Path $env:TEMP ('itchf-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $ok = $false
 
+# 0) local/UNC source wins - no network needed at all
+if ($Source) {
+  if (Test-Path (Join-Path $Source 'manifest.json')) {
+    New-Item -ItemType Directory -Path $EXTDIR -Force | Out-Null
+    Copy-Item (Join-Path $Source '*') $EXTDIR -Force -Recurse
+    $ok = $true
+    Write-Host "Extension -> $EXTDIR  (copied from $Source)"
+  } else {
+    Write-Host "!! -Source '$Source' has no manifest.json" -ForegroundColor Red
+    exit 1
+  }
+}
+
 # 1) fastest: the repo zip. Some networks resolve raw.githubusercontent.com but
 #    NOT github.com, so this is attempted first and simply falls through.
+if (-not $ok) {
 try {
   $zip = Join-Path $tmp 'repo.zip'
   Invoke-WebRequest "https://github.com/$REPO/archive/refs/heads/$BRANCH.zip" -OutFile $zip -UseBasicParsing -TimeoutSec 25
@@ -132,6 +149,7 @@ try {
   Write-Host "Extension -> $EXTDIR  (via github.com zip)"
 } catch {
   Write-Host "zip download unavailable ($($_.Exception.Message.Split([char]10)[0])) - falling back to raw file download..." -ForegroundColor Yellow
+}
 }
 
 # 2) fallback: pull each file straight from raw.githubusercontent.com
