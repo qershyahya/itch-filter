@@ -69,6 +69,8 @@ Get-ChildItem 'C:\Users' -Directory -ErrorAction SilentlyContinue |
   ForEach-Object {
     $roots += (Join-Path $_.FullName 'AppData\Roaming\Microsoft\Windows\Start Menu\Programs')
     $roots += (Join-Path $_.FullName 'Desktop')
+    # taskbar pins are the launch point most people actually click
+    $roots += (Join-Path $_.FullName 'AppData\Roaming\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar')
   }
 $roots = $roots | Select-Object -Unique | Where-Object { Test-Path $_ }
 
