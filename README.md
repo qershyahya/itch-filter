@@ -14,11 +14,14 @@ so nothing appears and then vanishes, and a card you can see is a page you can o
 
 ### Windows - one script, all browsers
 
-Run in an **elevated PowerShell** (right-click PowerShell -> *Run as administrator*):
+Run in an **elevated PowerShell** (right-click PowerShell -> *Run as administrator*).
+No clone needed - this downloads and runs the current script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\policies\windows\install-all.ps1
+$f="$env:TEMP\install-all.ps1"; irm https://raw.githubusercontent.com/qershyahya/itch-filter/main/tools/policies/windows/install-all.ps1 -OutFile $f; powershell -ExecutionPolicy Bypass -File $f
 ```
+
+(If you cloned the repo, `powershell -ExecutionPolicy Bypass -File tools\policies\windows\install-all.ps1` works from the repo root.)
 
 It detects Firefox / Chrome / Edge / Opera, asks which to install into
 (**press Enter = all**), downloads the latest extension from this repo, installs
@@ -35,13 +38,13 @@ install-all.ps1 -Quiet                   # unattended, all detected
 Verify at any time (no admin needed) - exit code 0 = all protected:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\policies\windows\verify-install.ps1
+$f="$env:TEMP\verify-install.ps1"; irm https://raw.githubusercontent.com/qershyahya/itch-filter/main/tools/policies/windows/verify-install.ps1 -OutFile $f; powershell -ExecutionPolicy Bypass -File $f
 ```
 
 Remove everything (elevated):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\policies\windows\uninstall-all.ps1
+$f="$env:TEMP\uninstall-all.ps1"; irm https://raw.githubusercontent.com/qershyahya/itch-filter/main/tools/policies/windows/uninstall-all.ps1 -OutFile $f; powershell -ExecutionPolicy Bypass -File $f
 ```
 
 ### Linux / macOS
