@@ -114,18 +114,56 @@ Write-Host ("`nInstalling into: " + ($selected -join ', '))
 
 # ---------- download the extension ----------
 Say 'Downloading extension'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$RAW = "https://raw.githubusercontent.com/$REPO/$BRANCH"
 $tmp = Join-Path $env:TEMP ('itchf-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+$ok = $false
+
+# 1) fastest: the repo zip. Some networks resolve raw.githubusercontent.com but
+#    NOT github.com, so this is attempted first and simply falls through.
 try {
-  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
   $zip = Join-Path $tmp 'repo.zip'
-  Invoke-WebRequest "https://github.com/$REPO/archive/refs/heads/$BRANCH.zip" -OutFile $zip -UseBasicParsing
+  Invoke-WebRequest "https://github.com/$REPO/archive/refs/heads/$BRANCH.zip" -OutFile $zip -UseBasicParsing -TimeoutSec 25
   Expand-Archive $zip -DestinationPath $tmp -Force
   New-Item -ItemType Directory -Path $EXTDIR -Force | Out-Null
   Copy-Item (Join-Path $tmp "itch-filter-$BRANCH\itch-filter-extension\*") $EXTDIR -Force -Recurse
-  Write-Host "Extension -> $EXTDIR"
-} catch { Write-Host "!! download failed: $($_.Exception.Message)"; exit 1 }
-finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+  $ok = $true
+  Write-Host "Extension -> $EXTDIR  (via github.com zip)"
+} catch {
+  Write-Host "zip download unavailable ($($_.Exception.Message.Split([char]10)[0])) - falling back to raw file download..." -ForegroundColor Yellow
+}
+
+# 2) fallback: pull each file straight from raw.githubusercontent.com
+if (-not $ok) {
+  $files = @('background.js','content.js','defaultConfig.js','manifest.json',
+             'manifest.firefox.json','options.html','options.js','rules.js',
+             'welcome.html','welcome.js','README.md')
+  try {
+    $lst = (Invoke-WebRequest "$RAW/tools/extension-files.txt" -UseBasicParsing -TimeoutSec 20).Content
+    $parsed = $lst -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    if ($parsed.Count -gt 0) { $files = $parsed }
+  } catch { }   # keep the built-in list
+
+  New-Item -ItemType Directory -Path $EXTDIR -Force | Out-Null
+  $got = 0
+  foreach ($f in $files) {
+    try {
+      Invoke-WebRequest "$RAW/itch-filter-extension/$f" -OutFile (Join-Path $EXTDIR $f) -UseBasicParsing -TimeoutSec 25
+      $got++
+    } catch { Write-Host "  could not fetch $f" -ForegroundColor Yellow }
+  }
+  if (Test-Path (Join-Path $EXTDIR 'manifest.json')) {
+    $ok = $true
+    Write-Host "Extension -> $EXTDIR  ($got files via raw.githubusercontent.com)"
+  }
+}
+Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+if (-not $ok) {
+  Write-Host '!! Could not download the extension.' -ForegroundColor Red
+  Write-Host '   Check that raw.githubusercontent.com is reachable from this machine.'
+  exit 1
+}
 
 # ---------- welcome page ----------
 @'

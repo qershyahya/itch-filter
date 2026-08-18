@@ -1,0 +1,11 @@
+background.js
+content.js
+defaultConfig.js
+manifest.firefox.json
+manifest.json
+options.html
+options.js
+README.md
+rules.js
+welcome.html
+welcome.js
