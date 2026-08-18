@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "itch.io Content Filter",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Filters itch.io games, jams, devlogs, collections and comments for a safe, family-friendly environment.",
   "permissions": [
     "storage",
@@ -34,7 +34,7 @@
   "options_page": "options.html",
   "action": {
     "default_title": "itch.io Content Filter — settings",
-    "default_popup": "options.html"
+    "default_popup": "welcome.html"
   },
   "update_url": "https://raw.githubusercontent.com/qershyahya/itch-filter/main/updates.xml"
 }

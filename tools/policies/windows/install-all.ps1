@@ -30,19 +30,62 @@ function Say($m){ Write-Host "`n=== $m ===" -ForegroundColor Cyan }
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
 
 # ---------- detect installed browsers ----------
-$paths = [ordered]@{
+# Fixed paths alone miss per-user installs (Opera, and Chrome/Edge installed for a
+# single user) and anything installed for a DIFFERENT user than the elevated one.
+# So: registry App Paths (both registry views, HKLM + every loaded user hive),
+# then well-known folders, then a scan of every user profile.
+$exeNames = [ordered]@{ firefox='firefox.exe'; chrome='chrome.exe'; edge='msedge.exe'; opera='opera.exe' }
+
+function Get-FromAppPaths([string]$exe) {
+  $keys = @(
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$exe",
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\$exe",
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$exe"
+  )
+  # every loaded user hive too (the elevated account may not be the student's)
+  Get-ChildItem 'Registry::HKEY_USERS' -EA SilentlyContinue |
+    Where-Object { $_.Name -notmatch '_Classes$' } |
+    ForEach-Object { $keys += "Registry::$($_.Name)\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$exe" }
+  foreach ($k in $keys) {
+    $v = (Get-ItemProperty $k -EA SilentlyContinue).'(default)'
+    if ($v) { $v = $v.Trim('"'); if (Test-Path $v) { return $v } }
+  }
+  $null
+}
+
+$static = [ordered]@{
   firefox = @("$env:ProgramFiles\Mozilla Firefox\firefox.exe", "${env:ProgramFiles(x86)}\Mozilla Firefox\firefox.exe")
   chrome  = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe")
   edge    = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe")
-  opera   = @("$env:LOCALAPPDATA\Programs\Opera\opera.exe", "$env:ProgramFiles\Opera\opera.exe", "${env:ProgramFiles(x86)}\Opera\opera.exe")
+  opera   = @("$env:ProgramFiles\Opera\opera.exe", "${env:ProgramFiles(x86)}\Opera\opera.exe")
 }
+# per-user install locations, across ALL profiles
+$userRel = [ordered]@{
+  firefox = @('AppData\Local\Mozilla Firefox\firefox.exe')
+  chrome  = @('AppData\Local\Google\Chrome\Application\chrome.exe')
+  edge    = @('AppData\Local\Microsoft\Edge\Application\msedge.exe')
+  opera   = @('AppData\Local\Programs\Opera\opera.exe','AppData\Local\Programs\Opera GX\opera.exe')
+}
+
 $found = [ordered]@{}
-foreach ($k in $paths.Keys) {
-  $hit = $paths[$k] | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-  if (-not $hit -and $k -eq 'opera') {
-    # Opera installs per-version under Programs\Opera\<ver>\opera.exe on some builds
-    $hit = Get-ChildItem "$env:LOCALAPPDATA\Programs\Opera" -Recurse -Filter opera.exe -ErrorAction SilentlyContinue |
-             Select-Object -First 1 -ExpandProperty FullName
+foreach ($k in $exeNames.Keys) {
+  $hit = $null
+  foreach ($p in $static[$k]) { if ($p -and (Test-Path $p)) { $hit = $p; break } }
+  if (-not $hit) { $hit = Get-FromAppPaths $exeNames[$k] }
+  if (-not $hit) {
+    foreach ($u in (Get-ChildItem 'C:\Users' -Directory -EA SilentlyContinue)) {
+      foreach ($rel in $userRel[$k]) {
+        $p = Join-Path $u.FullName $rel
+        if (Test-Path $p) { $hit = $p; break }
+      }
+      # Opera keeps a versioned subfolder on some builds
+      if (-not $hit -and $k -eq 'opera') {
+        $base = Join-Path $u.FullName 'AppData\Local\Programs'
+        $hit = Get-ChildItem $base -Recurse -Filter 'opera.exe' -Depth 3 -EA SilentlyContinue |
+                 Select-Object -First 1 -ExpandProperty FullName
+      }
+      if ($hit) { break }
+    }
   }
   if ($hit) { $found[$k] = $hit }
 }

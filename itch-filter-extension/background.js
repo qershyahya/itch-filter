@@ -54,11 +54,19 @@ async function syncRemote(force = false) {
 }
 
 // seed default config on install, then sync + schedule hourly pulls
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   const { config } = await chrome.storage.local.get("config");
   if (!config) await chrome.storage.local.set({ config: self.DEFAULT_CONFIG });
   chrome.alarms.create("cf-sync", { periodInMinutes: 60 });
   syncRemote(true);
+  // onboarding page: first install only — never on update or browser restart
+  if (details?.reason === "install") {
+    const { onboarded } = await chrome.storage.local.get("onboarded");
+    if (!onboarded) {
+      await chrome.storage.local.set({ onboarded: true });
+      chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+    }
+  }
 });
 chrome.runtime.onStartup.addListener(() => syncRemote(true));   // every Chrome reload
 chrome.alarms.onAlarm.addListener((a) => { if (a.name === "cf-sync") syncRemote(true); });

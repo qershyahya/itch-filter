@@ -237,6 +237,25 @@
     });
   }
 
+  /* ---- randomizer sidebar "recently viewed": every entry except the current
+     (already-verified) one is a game we may have skipped for being banned, so
+     its art/title must not linger. Hide them all. ---- */
+  function filterRandomizerHistory() {
+    const side = document.querySelector('[id^="randomizer_sidebar"], .randomizer_sidebar_widget');
+    if (!side) return;
+    side.querySelectorAll('a[href*=".itch.io/"]').forEach((a) => {
+      if (a.closest(".current_object")) return;          // the live roll, handled above
+      if (/\/(g|jam)\//.test(a.getAttribute("href") || "")) return;
+      // climb to the entry row, but never past the sidebar itself
+      let n = a;
+      for (let i = 0; i < 4 && n.parentElement && n.parentElement !== side; i++) {
+        if (n.parentElement.querySelectorAll('a[href*=".itch.io/"]').length > 1) break;
+        n = n.parentElement;
+      }
+      if (n !== side) n.style.display = "none";
+    });
+  }
+
   /* ---- remove ONLY banned tag/genre links ---- */
   function hideBannedTagLinks(root = document) {
     root.querySelectorAll('a[href*="/tag-"], a[href*="/genre-"]').forEach((a) => {
@@ -254,6 +273,7 @@
     filterCards();
     filterJams();
     filterRandomizer();
+    filterRandomizerHistory();
     filterComments();
     filterTextRows();
     filterDevlogs();
@@ -271,7 +291,7 @@
         saw = true;
         filterComments(n); filterTextRows(n); filterDevlogs(n); hideBannedTagLinks(n);
       }));
-      if (saw) { filterCards(); filterJams(); filterRandomizer(); }
+      if (saw) { filterCards(); filterJams(); filterRandomizer(); filterRandomizerHistory(); }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
