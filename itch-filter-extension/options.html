@@ -2,54 +2,75 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>itch.io Content Filter — Settings</title>
+<title>itch.io Safeguard Filter — Settings</title>
 <style>
-  body { font: 14px system-ui, sans-serif; background: #1b1733; color: #f4f1e8; margin: 0; padding: 20px; min-width: 420px; }
+  body { font: 14px system-ui, sans-serif; background: #1b1733; color: #f4f1e8; margin: 0; padding: 20px; min-width: 440px; }
   h1 { color: #ffc247; font-size: 20px; margin: 0 0 4px; }
   .sub { color: #a99fce; margin: 0 0 18px; }
   label { display: block; margin: 14px 0 4px; font-weight: 600; }
-  textarea { width: 100%; box-sizing: border-box; background: #241d46; color: #f4f1e8; border: 1px solid #43386f; border-radius: 6px; padding: 8px; font: 12px monospace; }
-  input[type=password] { background: #241d46; color: #f4f1e8; border: 1px solid #43386f; border-radius: 6px; padding: 8px; font-size: 14px; }
+  textarea, input[type=password], input[type=text] {
+    width: 100%; box-sizing: border-box; background: #241d46; color: #f4f1e8;
+    border: 1px solid #43386f; border-radius: 6px; padding: 8px; font: 12px monospace;
+  }
+  input[type=password] { font-size: 14px; }
   button { background: #ffc247; color: #241b3a; border: 0; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; margin-top: 12px; }
-  .row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+  button.ghost { background: #2e2657; color: #f4f1e8; border: 1px solid #43386f; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
   .msg { color: #6fd39a; margin-top: 10px; min-height: 18px; }
+  .err { color: #ff8a8a; }
   small { color: #a99fce; }
   .hidden { display: none; }
+  .card { background: #241d46; border: 1px solid #43386f; border-radius: 10px; padding: 14px; margin-top: 16px; }
+  .card h3 { margin: 0 0 8px; font-size: 14px; color: #ffc247; }
+  .card a { color: #9ecbff; }
 </style>
 </head>
 <body>
-  <h1>itch.io Content Filter</h1>
-  <p class="sub">Settings are PIN-protected. Only a parent/teacher should have the PIN.</p>
+  <h1>itch.io Safeguard Filter</h1>
+  <p class="sub">Protected settings. A secret key is required to view or change the filter lists.</p>
 
-  <div id="setpin" class="hidden">
-    <label>Create a parent PIN</label>
-    <input type="password" id="newpin" placeholder="Choose a PIN (4+ chars)" />
-    <button id="createpin">Set PIN</button>
+  <!-- LOCKED VIEW: the only thing a student can see -->
+  <div id="lock">
+    <label for="pw">Secret key</label>
+    <input type="password" id="pw" placeholder="Enter secret key" autocomplete="off" />
+    <div class="row">
+      <button id="unlock">Unlock</button>
+      <button id="checkUpdates" class="ghost">Check for updates</button>
+    </div>
+    <p class="msg" id="lockmsg"></p>
+
+    <div class="card">
+      <h3>Need access or help?</h3>
+      <p>The filter lists are managed by the administrator. To request a change or
+         report a wrongly blocked page, contact support:</p>
+      <p>📞 <a href="tel:+201101196911">+20 110 119 6911</a><br />
+         ✉️ <a href="mailto:qershyahya@gmail.com">qershyahya@gmail.com</a></p>
+    </div>
   </div>
 
-  <div id="lock" class="hidden">
-    <label>Enter parent PIN to edit</label>
-    <input type="password" id="pin" placeholder="Parent PIN" />
-    <button id="unlock">Unlock</button>
-  </div>
-
+  <!-- UNLOCKED VIEW -->
   <div id="editor" class="hidden">
     <div class="row"><input type="checkbox" id="enabled" /><label style="margin:0">Filter enabled</label></div>
     <label>Banned tags / genres <small>(one per line)</small></label>
     <textarea id="bannedTags" rows="5"></textarea>
     <label>Banned keywords <small>(one per line)</small></label>
     <textarea id="bannedKeywords" rows="8"></textarea>
-    <label>Block-list <small>(URL words: jam slugs, creators, game slugs — one per line)</small></label>
+    <label>Block-list <small>(URL words: jam slugs, creators, game slugs)</small></label>
     <textarea id="blockedSlugs" rows="3"></textarea>
     <label>Blocked creators <small>(usernames)</small></label>
     <textarea id="blockedCreators" rows="2"></textarea>
     <label>Allow overrides <small>(game ids to never hide)</small></label>
     <textarea id="allowedIds" rows="2"></textarea>
     <label>Review form — response URL <small>(Google Form .../formResponse)</small></label>
-    <input type="text" id="reviewUrl" style="width:100%;box-sizing:border-box;background:#241d46;color:#f4f1e8;border:1px solid #43386f;border-radius:6px;padding:8px;font:12px monospace" />
+    <input type="text" id="reviewUrl" />
     <label>Review form — URL field id <small>(e.g. entry.123456789)</small></label>
-    <input type="text" id="reviewEntry" style="width:100%;box-sizing:border-box;background:#241d46;color:#f4f1e8;border:1px solid #43386f;border-radius:6px;padding:8px;font:12px monospace" />
-    <button id="save">Save changes</button>
+    <input type="text" id="reviewEntry" />
+    <div class="row">
+      <button id="save">Save changes</button>
+      <button id="lockAgain" class="ghost">Lock</button>
+    </div>
+    <p><small>Note: lists are re-synced from the administrator's central config, so
+      local edits are replaced on the next sync.</small></p>
   </div>
 
   <p class="msg" id="msg"></p>

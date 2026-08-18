@@ -12,10 +12,17 @@
 
   /* ---- hide-until-verified CSS injected immediately (before cards paint) ---- */
   (function injectHide() {
+    // hide EVERY game cell until verified — featured/promoted cells carry no
+    // data-game_id, so requiring it let them through unchecked.
+    // hide EVERY game cell until verified — featured/promoted cells carry no
+    // data-game_id, so requiring it let them through unchecked.
     const css =
-      ".game_cell[data-game_id]:not([data-cf-ok]){display:none !important}" +
+      ".game_cell:not([data-cf-ok]){display:none !important}" +
       ".cf-devrow:not([data-cf-ok]){display:none !important}" +
-      ".jam:not([data-cf-ok]),.jam_cell:not([data-cf-ok]){display:none !important}";
+      ".jam:not([data-cf-ok]),.jam_cell:not([data-cf-ok]){display:none !important}" +
+      // randomizer: never show the rolled game's art/name/viewer before it is cleared
+      ".randomizer_page .current_object:not([data-cf-ok]){visibility:hidden !important}" +
+      ".randomizer_page.cf-rolling .object_viewer{visibility:hidden !important}";
     const put = () => {
       if (document.getElementById("cf-hide")) return true;
       const t = document.head || document.documentElement;
@@ -60,12 +67,19 @@
     };
     if (classify(c, cfg).blocked || slugBlocked(c.url || "")) return; // banned → stay hidden
     if (!c.url) return; // can't verify → stay hidden (fail-closed)
+    // featured grids render JAMS as .game_cell too; those have no game page to
+    // fetch, so judge them the same way as jam cards (title/blurb/slug).
+    if (/\/jam\//.test(c.url)) {
+      const blurb = textOf(cell, ".game_text, .short_text");
+      if (!classify({ kind: "card", title: c.title + " " + blurb }, cfg).blocked) reveal(cell);
+      return;
+    }
     checkGame(c.url).then((r) => { if (r && r.blocked === false) reveal(cell); });
   }
   function filterCards() {
     if (!cfg.enabled) return;
     document
-      .querySelectorAll(".game_cell[data-game_id]:not([data-cf-checked])")
+      .querySelectorAll(".game_cell:not([data-cf-checked])")
       .forEach(checkOne);
   }
 
@@ -187,6 +201,42 @@
     });
   }
 
+  /* ---- randomizer: verify each roll; auto-skip banned ones instead of
+     dumping the student on a "Hidden" page with the art still in the sidebar ---- */
+  let rollSkips = 0;
+  function filterRandomizer() {
+    const page = document.querySelector(".randomizer_page");
+    if (!page) return;
+    const cur = page.querySelector(".current_object");
+    if (!cur) return;
+    const url = cur.querySelector("h1 a[href]")?.href || "";
+    if (!url) return;
+    if (cur.getAttribute("data-cf-url") === url) return; // this roll already handled
+    cur.setAttribute("data-cf-url", url);
+    cur.removeAttribute("data-cf-ok");
+    page.classList.add("cf-rolling");
+
+    const next = () => {
+      const btn = page.querySelector(".next_game_btn");
+      if (rollSkips++ < 25 && btn) btn.click();
+      else {
+        page.classList.remove("cf-rolling");
+        cur.setAttribute("data-cf-ok", "1");
+        cur.innerHTML =
+          '<h1 style="color:#ffc247">Nothing suitable found</h1>' +
+          "<p>The randomizer kept landing on blocked games. Try browsing instead.</p>";
+      }
+    };
+    if (slugBlocked(url)) return next();
+    checkGame(url).then((r) => {
+      if (r && r.blocked === false) {
+        rollSkips = 0;
+        page.classList.remove("cf-rolling");
+        cur.setAttribute("data-cf-ok", "1");
+      } else next();
+    });
+  }
+
   /* ---- remove ONLY banned tag/genre links ---- */
   function hideBannedTagLinks(root = document) {
     root.querySelectorAll('a[href*="/tag-"], a[href*="/genre-"]').forEach((a) => {
@@ -203,6 +253,7 @@
     if (filterBannedUrl()) return;
     filterCards();
     filterJams();
+    filterRandomizer();
     filterComments();
     filterTextRows();
     filterDevlogs();
@@ -220,7 +271,7 @@
         saw = true;
         filterComments(n); filterTextRows(n); filterDevlogs(n); hideBannedTagLinks(n);
       }));
-      if (saw) { filterCards(); filterJams(); }
+      if (saw) { filterCards(); filterJams(); filterRandomizer(); }
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 

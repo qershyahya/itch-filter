@@ -13,7 +13,10 @@ if (typeof importScripts === "function") importScripts("rules.js", "defaultConfi
    if GitHub is unreachable, so blocking never silently turns off. */
 const SYNC_URL = "https://raw.githubusercontent.com/qershyahya/itch-filter/main/filter-config.json";
 const SYNC_FIELDS = ["enabled", "bannedTags", "bannedKeywords", "blockedSlugs", "blockedCreators", "allowedIds", "blockedIds"];
-const SYNC_STRINGS = ["reviewUrl", "reviewEntry", "reviewReasonEntry"]; // review-request Google Form target
+// review-form target + the admin secret key (re-asserted so a local wipe is undone)
+const SYNC_STRINGS = ["reviewUrl", "reviewEntry", "reviewReasonEntry",
+                      "pwHash", "pwSalt", "supportPhone", "supportEmail"];
+const SYNC_NUMBERS = ["pwIters"];
 const SYNC_THROTTLE_MS = 120000; // network floor: at most one pull per 2 min from page-load pings
 let lastSyncAt = 0, syncing = null;
 
@@ -38,7 +41,8 @@ async function syncRemote(force = false) {
       const next = { ...cur }; // keeps pinHash/pinSalt
       for (const k of SYNC_FIELDS) if (Array.isArray(remote[k]) || typeof remote[k] === "boolean") next[k] = remote[k];
       for (const k of SYNC_STRINGS) if (typeof remote[k] === "string") next[k] = remote[k];
-      const all = [...SYNC_FIELDS, ...SYNC_STRINGS];
+      for (const k of SYNC_NUMBERS) if (typeof remote[k] === "number") next[k] = remote[k];
+      const all = [...SYNC_FIELDS, ...SYNC_STRINGS, ...SYNC_NUMBERS];
       // write when the remote changed OR local lists drifted from remote (tamper revert)
       if (hash !== cfgHash || pick(next, all) !== pick(cur, all)) {
         await chrome.storage.local.set({ config: next, cfgHash: hash, lastSync: Date.now() });
@@ -154,6 +158,6 @@ async function submitReview(url, reason) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "check-game") { checkGame(msg.url).then(sendResponse); return true; }
-  if (msg?.type === "sync-now") { syncRemote(false).then(() => sendResponse(true)); return true; } // page-load freshness check
+  if (msg?.type === "sync-now") { syncRemote(Boolean(msg.force)).then(() => sendResponse(true)); return true; } // page-load freshness check
   if (msg?.type === "review-submit") { submitReview(msg.url, msg.reason).then(sendResponse); return true; }
 });
